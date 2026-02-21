@@ -2,30 +2,76 @@ import streamlit as st
 import pandas as pd
 import joblib
 
-st.title("Weather Monitoring & Temperature Forecast")
+# =========================
+# ส่วนหัวเว็บ
+# =========================
+st.set_page_config(
+    page_title="ระบบติดตามสภาพอากาศและพยากรณ์อุณหภูมิ",
+    layout="centered"
+)
 
+st.title("🌦️ ระบบติดตามสภาพอากาศและพยากรณ์อุณหภูมิ")
+st.write(
+    "เว็บแอปนี้ใช้สำหรับอัปโหลดข้อมูลสภาพอากาศจาก IoT Sensor "
+    "และแสดงผลการพยากรณ์อุณหภูมิด้วย Machine Learning"
+)
+
+st.divider()
+
+# =========================
+# โหลดโมเดล
+# =========================
 model = joblib.load("temp_model.pkl")
 
-uploaded_file = st.file_uploader("Upload CSV file")
+# =========================
+# อัปโหลดไฟล์
+# =========================
+uploaded_file = st.file_uploader(
+    "📂 อัปโหลดไฟล์ข้อมูลสภาพอากาศ (CSV)",
+    type=["csv"]
+)
 
-if uploaded_file:
+if uploaded_file is not None:
+    # =========================
+    # โหลดข้อมูล
+    # =========================
     df = pd.read_csv(uploaded_file)
 
-    required_cols = ['temp','humudity','pressure','wind','rain drop','uv']
-    if not all(col in df.columns for col in required_cols):
-        st.error("CSV file missing required columns")
-        st.stop()
-
-    df['temp_lag1'] = df['temp'].shift(1)
+    # สร้าง lag feature
+    df["temp_lag1"] = df["temp"].shift(1)
     df = df.dropna()
 
-    X = df[['temp_lag1','humudity','pressure','wind','rain drop','uv']]
-    df['predicted_temp'] = model.predict(X)
+    # =========================
+    # เตรียมข้อมูลทำนาย
+    # =========================
+    features = [
+        "temp_lag1",
+        "humudity",
+        "pressure",
+        "wind",
+        "rain drop",
+        "uv"
+    ]
 
-    st.subheader("Temperature Prediction Result")
-    st.line_chart(df[['temp','predicted_temp']])
+    X = df[features]
 
-    st.subheader("Uploaded Data")
+    # =========================
+    # พยากรณ์
+    # =========================
+    df["predicted_temp"] = model.predict(X)
+
+    # =========================
+    # แสดงผล
+    # =========================
+    st.subheader("📈 ผลการพยากรณ์อุณหภูมิ")
+
+    chart_df = df[["temp", "predicted_temp"]]
+    st.line_chart(chart_df)
+
+    st.subheader("📋 ตัวอย่างข้อมูลที่อัปโหลด")
     st.dataframe(df.head(20))
 
-    st.success(f"Prediction completed for {len(df)} records")
+    st.success(f"✅ พยากรณ์สำเร็จทั้งหมด {len(df)} รายการ")
+
+else:
+    st.info("กรุณาอัปโหลดไฟล์ CSV เพื่อเริ่มการพยากรณ์")
