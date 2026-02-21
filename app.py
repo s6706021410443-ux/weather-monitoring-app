@@ -3,47 +3,61 @@ import pandas as pd
 import joblib
 
 # =========================
-# ส่วนหัวเว็บ
+# Page Configuration
 # =========================
 st.set_page_config(
-    page_title="ระบบติดตามสภาพอากาศและพยากรณ์อุณหภูมิ",
-    layout="centered"
+    page_title="Weather Monitoring & Temperature Forecast",
+    page_icon="🌦️",
+    layout="wide"
 )
 
-st.title("🌦️ ระบบติดตามสภาพอากาศและพยากรณ์อุณหภูมิ")
-st.write(
-    "เว็บแอปนี้ใช้สำหรับอัปโหลดข้อมูลสภาพอากาศจาก IoT Sensor "
-    "และแสดงผลการพยากรณ์อุณหภูมิด้วย Machine Learning"
+# =========================
+# Header
+# =========================
+st.title("🌦️ Weather Monitoring & Temperature Forecast")
+st.markdown(
+    """
+    This web application is designed to **upload weather data collected from IoT sensors**
+    and **predict hourly temperature** using a Machine Learning model.
+
+    The uploaded file is treated as **unseen data** (not used in model training),
+    which demonstrates real-world deployment of the forecasting system.
+    """
 )
 
 st.divider()
 
 # =========================
-# โหลดโมเดล
+# Load Model
 # =========================
-model = joblib.load("temp_model.pkl")
+@st.cache_resource
+def load_model():
+    return joblib.load("temp_model.pkl")
+
+model = load_model()
 
 # =========================
-# อัปโหลดไฟล์
+# File Upload
 # =========================
+st.subheader("📂 Upload Weather Data (CSV)")
 uploaded_file = st.file_uploader(
-    "📂 อัปโหลดไฟล์ข้อมูลสภาพอากาศ (CSV)",
+    "Please upload a CSV file containing weather sensor data",
     type=["csv"]
 )
 
 if uploaded_file is not None:
+
     # =========================
-    # โหลดข้อมูล
+    # Load & Prepare Data
     # =========================
     df = pd.read_csv(uploaded_file)
 
-    # สร้าง lag feature
+    st.markdown("### 🔍 Data Preparation")
+    st.write("Creating lag feature and preparing data for prediction.")
+
     df["temp_lag1"] = df["temp"].shift(1)
     df = df.dropna()
 
-    # =========================
-    # เตรียมข้อมูลทำนาย
-    # =========================
     features = [
         "temp_lag1",
         "humudity",
@@ -56,22 +70,35 @@ if uploaded_file is not None:
     X = df[features]
 
     # =========================
-    # พยากรณ์
+    # Prediction
     # =========================
     df["predicted_temp"] = model.predict(X)
 
     # =========================
-    # แสดงผล
+    # Visualization
     # =========================
-    st.subheader("📈 ผลการพยากรณ์อุณหภูมิ")
+    st.divider()
+    st.subheader("📈 Temperature Prediction Result")
 
-    chart_df = df[["temp", "predicted_temp"]]
+    chart_df = df[["temp", "predicted_temp"]].rename(
+        columns={
+            "temp": "Actual Temperature (°C)",
+            "predicted_temp": "Predicted Temperature (°C)"
+        }
+    )
+
     st.line_chart(chart_df)
 
-    st.subheader("📋 ตัวอย่างข้อมูลที่อัปโหลด")
-    st.dataframe(df.head(20))
+    # =========================
+    # Data Preview
+    # =========================
+    st.subheader("📋 Uploaded Data Preview")
+    st.dataframe(df.head(20), use_container_width=True)
 
-    st.success(f"✅ พยากรณ์สำเร็จทั้งหมด {len(df)} รายการ")
+    # =========================
+    # Status
+    # =========================
+    st.success(f"✅ Prediction completed for {len(df)} records")
 
 else:
-    st.info("กรุณาอัปโหลดไฟล์ CSV เพื่อเริ่มการพยากรณ์")
+    st.info("⬆️ Please upload a CSV file to start temperature prediction.")
