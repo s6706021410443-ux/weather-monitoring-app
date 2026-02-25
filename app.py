@@ -17,43 +17,51 @@ st.set_page_config(
 st.title("🌦️ Weather Monitoring & Temperature Forecast")
 st.markdown(
     """
-    This web application is designed to **upload weather data collected from IoT sensors**
-    and **predict hourly temperature** using a Machine Learning model.
-
-    The uploaded file is treated as **unseen data** (not used in model training),
-    which demonstrates real-world deployment of the forecasting system.
+    Upload **unseen weather data** collected from IoT sensors  
+    and compare **temperature predictions** from different machine learning models.
     """
 )
 
 st.divider()
 
 # =========================
-# Load Model
+# Load Models
 # =========================
 @st.cache_resource
-def load_model():
-    return joblib.load("temp_model.pkl")
+def load_models():
+    return {
+        "Random Forest": joblib.load("temp_model.pkl"),
+        "Linear Regression": joblib.load("temp_model_lr.pkl")
+    }
 
-model = load_model()
+models = load_models()
+
+# =========================
+# Model Selection
+# =========================
+st.subheader("🧠 Model Selection")
+selected_models = st.multiselect(
+    "Select model(s) for prediction",
+    options=list(models.keys()),
+    default=["Random Forest"]
+)
+
+st.divider()
 
 # =========================
 # File Upload
 # =========================
-st.subheader("📂 Upload Weather Data (CSV)")
 uploaded_file = st.file_uploader(
-    "Please upload a CSV file containing weather sensor data",
+    "📂 Upload Weather CSV file",
     type=["csv"]
 )
 
-if uploaded_file is not None:
+if uploaded_file and selected_models:
 
     # =========================
-    # Load & Prepare Data
+    # Data Preparation
     # =========================
     df = pd.read_csv(uploaded_file)
-
-    st.markdown("### 🔍 Data Preparation")
-    st.write("Creating lag feature and preparing data for prediction.")
 
     df["temp_lag1"] = df["temp"].shift(1)
     df = df.dropna()
@@ -72,33 +80,28 @@ if uploaded_file is not None:
     # =========================
     # Prediction
     # =========================
-    df["predicted_temp"] = model.predict(X)
+    result_df = pd.DataFrame()
+    result_df["Actual Temperature (°C)"] = df["temp"]
+
+    for model_name in selected_models:
+        result_df[f"{model_name} Prediction (°C)"] = models[model_name].predict(X)
 
     # =========================
     # Visualization
     # =========================
-    st.divider()
-    st.subheader("📈 Temperature Prediction Result")
-
-    chart_df = df[["temp", "predicted_temp"]].rename(
-        columns={
-            "temp": "Actual Temperature (°C)",
-            "predicted_temp": "Predicted Temperature (°C)"
-        }
-    )
-
-    st.line_chart(chart_df)
+    st.subheader("📈 Temperature Prediction Comparison")
+    st.line_chart(result_df)
 
     # =========================
     # Data Preview
     # =========================
-    st.subheader("📋 Uploaded Data Preview")
-    st.dataframe(df.head(20), use_container_width=True)
+    st.subheader("📋 Prediction Result Preview")
+    st.dataframe(result_df.head(20), use_container_width=True)
 
-    # =========================
-    # Status
-    # =========================
-    st.success(f"✅ Prediction completed for {len(df)} records")
+    st.success(
+        f"✅ Prediction completed using {len(selected_models)} model(s) "
+        f"for {len(result_df)} records"
+    )
 
 else:
-    st.info("⬆️ Please upload a CSV file to start temperature prediction.")
+    st.info("⬆️ Please upload a CSV file and select at least one model.")
