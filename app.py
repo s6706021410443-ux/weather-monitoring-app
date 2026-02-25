@@ -2,63 +2,12 @@ import streamlit as st
 import pandas as pd
 import joblib
 
-# =========================
-# Page Configuration
-# =========================
 st.set_page_config(
     page_title="Weather Monitoring & Temperature Forecast",
     page_icon="🌦️",
     layout="wide"
 )
 
-# =========================
-# Theme Toggle
-# =========================
-if "theme" not in st.session_state:
-    st.session_state.theme = "dark"
-
-col1, col2 = st.columns([6,1])
-with col2:
-    theme_choice = st.radio(
-        "Theme",
-        ["🌙 Dark", "🌞 Light"],
-        index=0 if st.session_state.theme == "dark" else 1,
-        label_visibility="collapsed"
-    )
-
-st.session_state.theme = "dark" if "Dark" in theme_choice else "light"
-
-def apply_theme(theme):
-    if theme == "dark":
-        st.markdown("""
-        <style>
-        .stApp {
-            background-color: #0e1117;
-            color: #fafafa;
-        }
-        section[data-testid="stSidebar"] {
-            background-color: #161b22;
-        }
-        </style>
-        """, unsafe_allow_html=True)
-    else:
-        st.markdown("""
-        <style>
-        .stApp {
-            background-color: #f5f7fa;
-            color: #000000;
-        }
-        section[data-testid="stSidebar"] {
-            background-color: #ffffff;
-        }
-        </style>
-        """, unsafe_allow_html=True)
-
-apply_theme(st.session_state.theme)
-
-# =========================
-# Header
-# =========================
 st.title("🌦️ Weather Monitoring & Temperature Forecast")
 st.markdown("""
 Upload unseen weather data collected from IoT sensors  
@@ -68,7 +17,7 @@ and compare temperature predictions from multiple models.
 st.divider()
 
 # =========================
-# Load Models (duplicate for demo)
+# Load Model (duplicate for demo)
 # =========================
 @st.cache_resource
 def load_models():
@@ -102,11 +51,9 @@ uploaded_file = st.file_uploader(
 
 if uploaded_file and selected_models:
 
-    # =========================
-    # Data Preparation
-    # =========================
     df = pd.read_csv(uploaded_file)
 
+    # Data Preparation
     df["temp_lag1"] = df["temp"].shift(1)
     df = df.dropna()
 
@@ -121,18 +68,14 @@ if uploaded_file and selected_models:
 
     X = df[features]
 
-    # =========================
     # Prediction
-    # =========================
     result_df = pd.DataFrame()
     result_df["Actual Temperature (°C)"] = df["temp"]
 
     for model_name in selected_models:
         result_df[f"{model_name} Prediction (°C)"] = models[model_name].predict(X)
 
-    # =========================
     # Visualization
-    # =========================
     st.subheader("📈 Temperature Prediction Comparison")
     st.line_chart(result_df)
 
