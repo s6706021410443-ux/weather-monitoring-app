@@ -2,61 +2,78 @@ import streamlit as st
 import pandas as pd
 import joblib
 
+# =========================
+# Page Configuration
+# =========================
 st.set_page_config(
     page_title="Weather Monitoring & Temperature Forecast",
     page_icon="🌦️",
     layout="wide"
 )
 
+# =========================
+# Header
+# =========================
 st.title("🌦️ Weather Monitoring & Temperature Forecast")
-st.markdown("""
-Upload unseen weather data collected from IoT sensors  
-and compare temperature predictions from multiple models.
-""")
+st.markdown(
+    """
+    เว็บแอปนี้ใช้สำหรับ **อัปโหลดข้อมูลสภาพอากาศจาก IoT Sensors**
+    และทำการ **พยากรณ์อุณหภูมิรายชั่วโมง (Hourly Temperature Forecast)**
 
-st.divider()
-
-# =========================
-# Load Model (duplicate for demo)
-# =========================
-@st.cache_resource
-def load_models():
-    model = joblib.load("temp_model.pkl")
-    return {
-        "Random Forest (Model A)": model,
-        "Random Forest (Model B)": model
-    }
-
-models = load_models()
-
-# =========================
-# Model Selection
-# =========================
-st.subheader("Model Selection")
-selected_models = st.multiselect(
-    "Select model(s) for prediction",
-    options=list(models.keys()),
-    default=["Random Forest (Model A)"]
+    ข้อมูลที่อัปโหลดจะถูกมองว่าเป็น **unseen data**
+    เพื่อแสดงการทำงานของระบบในขั้นตอน Deployment
+    """
 )
 
 st.divider()
+
+# =========================
+# Load Model
+# =========================
+@st.cache_resource
+def load_model():
+    return joblib.load("temp_model.pkl")
+
+model = load_model()
 
 # =========================
 # File Upload
 # =========================
+st.subheader("📂 Upload Weather Data (CSV)")
 uploaded_file = st.file_uploader(
-    "Upload Weather CSV file",
+    "อัปโหลดไฟล์ CSV ที่ได้จาก IoT Sensor",
     type=["csv"]
 )
 
-if uploaded_file and selected_models:
+if uploaded_file is not None:
 
+    # =========================
+    # Load Data
+    # =========================
     df = pd.read_csv(uploaded_file)
 
-    # Data Preparation
+    st.subheader("🔍 Data Preparation")
+
+    # แปลงเวลาเป็น datetime
+    df["datetime"] = pd.to_datetime(df["datetime"])
+
+    # เรียงตามเวลา
+    df = df.sort_values("datetime")
+
+    # สร้าง lag feature
     df["temp_lag1"] = df["temp"].shift(1)
+
+    # ลบแถวที่มีค่า NaN จาก lag
     df = df.dropna()
 
+    # ใช้เวลาเป็น index
+    df = df.set_index("datetime")
+
+    st.success("✅ Data prepared successfully")
+
+    # =========================
+    # Feature Selection
+    # =========================
     features = [
         "temp_lag1",
         "humudity",
@@ -68,22 +85,38 @@ if uploaded_file and selected_models:
 
     X = df[features]
 
+    # =========================
     # Prediction
-    result_df = pd.DataFrame()
-    result_df["Actual Temperature (°C)"] = df["temp"]
+    # =========================
+    df["Predicted Temperature (°C)"] = model.predict(X)
 
-    for model_name in selected_models:
-        result_df[f"{model_name} Prediction (°C)"] = models[model_name].predict(X)
-
+    # =========================
     # Visualization
-    st.subheader("Temperature Prediction Comparison")
+    # =========================
+    st.divider()
+    st.subheader("📈 Hourly Temperature Prediction")
+
+    result_df = df[
+        ["temp", "Predicted Temperature (°C)"]
+    ].rename(
+        columns={"temp": "Actual Temperature (°C)"}
+    )
+
     st.line_chart(result_df)
 
-    st.subheader("Prediction Preview")
-    st.dataframe(result_df.head(20), use_container_width=True)
+    # =========================
+    # Data Preview
+    # =========================
+    st.subheader("📋 Uploaded Data Preview")
+    st.dataframe(
+        result_df.reset_index().head(20),
+        use_container_width=True
+    )
 
-    st.success(f"Prediction completed for {len(result_df)} records")
+    # =========================
+    # Status
+    # =========================
+    st.success(f"✅ Prediction completed for {len(result_df)} records")
 
 else:
-    st.info("⬆️ Please upload a CSV file and select at least one model.")
-
+    st.info("⬆️ กรุณาอัปโหลดไฟล์ CSV เพื่อเริ่มการพยากรณ์อุณหภูมิ")
